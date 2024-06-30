@@ -1,0 +1,64 @@
+﻿@echo off
+setlocal
+
+:: Define the Downloads directory path
+set "downloadsPath=%USERPROFILE%\Downloads"
+set "outputFile=%downloadsPath%\SystemTypeResult.txt"
+
+:: Collect system information
+for /f "tokens=2 delims==" %%i in ('wmic computersystem get manufacturer /value') do set Manufacturer=%%i
+for /f "tokens=2 delims==" %%i in ('wmic computersystem get model /value') do set Model=%%i
+for /f "tokens=2 delims==" %%i in ('wmic bios get manufacturer /value') do set BIOSManufacturer=%%i
+for /f "tokens=2 delims==" %%i in ('wmic baseboard get product /value') do set BaseBoardProduct=%%i
+for /f "tokens=2 delims==" %%i in ('wmic systemenclosure get chassistypes /value') do set ChassisType=%%i
+
+:: Collect additional information
+for /f "tokens=2 delims==" %%i in ('wmic path win32_videocontroller get caption /value') do set VideoCard=%%i
+for /f "tokens=2 delims==" %%i in ('wmic path win32_networkadapter where "NetEnabled=true" get name /value') do set NetworkAdapter=%%i
+for /f "tokens=2 delims==" %%i in ('wmic desktopmonitor get screenheight,screenwidth /value') do set ScreenDimensions=%%i
+
+:: Collect CPU information
+for /f "tokens=2 delims==" %%i in ('wmic cpu get caption /value') do set CPU=%%i
+
+:: Collect HAL information
+for /f "tokens=2 delims==" %%i in ('wmic computersystem get systemtype /value') do set HAL=%%i
+
+:: Collect registry information
+reg query "HKLM\HARDWARE\DESCRIPTION\System" > "%downloadsPath%\RegistryInfo.txt"
+
+:: Display collected information
+echo System Information: > "%outputFile%"
+echo -------------------- >> "%outputFile%"
+echo Computer System: %Manufacturer% %Model% >> "%outputFile%"
+echo BIOS: %BIOSManufacturer% >> "%outputFile%"
+echo Base Board: %BaseBoardProduct% >> "%outputFile%"
+echo System Enclosure: %ChassisType% >> "%outputFile%"
+echo Video Card: %VideoCard% >> "%outputFile%"
+echo Network Adapter: %NetworkAdapter% >> "%outputFile%"
+echo Screen Dimensions: %ScreenDimensions% >> "%outputFile%"
+echo CPU: %CPU% >> "%outputFile%"
+echo HAL: %HAL% >> "%outputFile%"
+echo Registry Info: >> "%outputFile%"
+type "%downloadsPath%\RegistryInfo.txt" >> "%outputFile%"
+
+:: Check for VM indications in system information
+set "isVM=false"
+echo %Model% | findstr /i "VMware VirtualBox VirtualPC Hyper-V" >nul && set "isVM=true"
+echo %BIOSManufacturer% | findstr /i "VMware VirtualBox VirtualPC Hyper-V" >nul && set "isVM=true"
+echo %BaseBoardProduct% | findstr /i "VMware VirtualBox VirtualPC Hyper-V" >nul && set "isVM=true"
+echo %CPU% | findstr /i "Virtual" >nul && set "isVM=true"
+echo %HAL% | findstr /i "Virtual" >nul && set "isVM=true"
+type "%downloadsPath%\RegistryInfo.txt" | findstr /i "VMware VirtualBox VirtualPC Hyper-V" >nul && set "isVM=true"
+if %ChassisType%==1 set "isVM=true"
+
+:: Output result
+if "%isVM%"=="true" (
+    echo This system is running inside a Virtual Machine. >> "%outputFile%"
+) else (
+    echo This system is running on a Physical Machine. >> "%outputFile%"
+)
+
+:: Open the output file
+start "" "%outputFile%"
+
+endlocal
